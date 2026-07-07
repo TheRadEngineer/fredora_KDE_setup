@@ -1,0 +1,29 @@
+repositories:
+  anscer_iui:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_iui.git
+    version: develop
+  anscer_systems:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_systems.git
+    version: develop
+  anscer_sensors:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_sensors.git
+    version: develop
+  anscer_perception_localization:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_perception_localization.git
+    version: develop
+  anscer_navigation:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_navigation.git
+    version: develop
+  anscer_interface:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_interface.git
+    version: develop
+  anscer_simulation:
+    type: git
+    url: git@github.com:ANSCER-ROBOTICS-PVT-LTD/anscer_simulation.git
+    version: develop
