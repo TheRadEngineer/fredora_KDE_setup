@@ -126,7 +126,6 @@ REMOVE_GAMES=(
 # NOTE: knighttime, plasma-welcome, plasma-welcome-fedora, plasma-setup are
 # NOT listed here — they are plasma-desktop dependencies and cannot be removed.
 REMOVE_APPS=(
-    dragon                  # video player
     kamoso                  # webcam app
     kmouth                  # speech synthesis frontend
     kolourpaint             # basic paint app
