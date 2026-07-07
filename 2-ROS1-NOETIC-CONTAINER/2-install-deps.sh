@@ -759,11 +759,11 @@ export LIDAR_TYPE=2D
 CONFIG_EOF
 
   ok "Simulation config at $CONFIG_FILE"
-  mark_done "phase18"
+  mark_done "phase17"
 fi
 
 # =============================================================================
-# PHASE 19: npm install for Mission Control UI
+# PHASE 18: npm install for Mission Control UI
 # =============================================================================
 if is_done "phase18"; then skip "Phase 18 (npm) done"; else
   phase "PHASE 18/18 — npm install"
