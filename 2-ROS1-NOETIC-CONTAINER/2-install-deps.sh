@@ -207,6 +207,7 @@ $RESUME && info "Mode: RESUME"
 if is_done "phase01"; then skip "Phase 1 (bootstrap) done"; else
   phase "PHASE 1/18 — Bootstrap tools"
   export DEBIAN_FRONTEND=noninteractive
+  echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4 > /dev/null
   sudo apt-get update || {
     err "apt update failed"
     exit 1
