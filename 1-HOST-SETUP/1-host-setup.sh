@@ -719,6 +719,12 @@ stage_14_git_config() {
     mark_done "stage_14"
 }
 
+step "Installing MongoDB Compass"
+rpm -q mongodb-compass &>/dev/null && skip "Already installed" || {
+    run sudo dnf install -y https://downloads.mongodb.com/compass/mongodb-compass-1.49.8.x86_64.rpm \
+        && ok "Installed" || warn "Failed"
+}
+
 # =============================================================================
 # STAGE 15 — Wallpaper
 # =============================================================================
