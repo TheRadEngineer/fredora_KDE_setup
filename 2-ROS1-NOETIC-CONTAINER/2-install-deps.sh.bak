@@ -205,7 +205,7 @@ $RESUME && info "Mode: RESUME"
 # PHASE 1: Bootstrap tools
 # =============================================================================
 if is_done "phase01"; then skip "Phase 1 (bootstrap) done"; else
-  phase "PHASE 1/19 — Bootstrap tools"
+  phase "PHASE 1/18 — Bootstrap tools"
   export DEBIAN_FRONTEND=noninteractive
   echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4 > /dev/null
   sudo apt-get update || {
@@ -228,7 +228,7 @@ fi
 # NOTE: This script writes to ~/.bashrc — the orchestrator cleans it after.
 # =============================================================================
 if is_done "phase02"; then skip "Phase 2 (ROS Noetic) done"; else
-  phase "PHASE 2/19 — ROS Noetic"
+  phase "PHASE 2/18 — ROS Noetic"
   if [[ ! -d /opt/ros/noetic ]]; then
     cd /tmp
     wget -c https://raw.githubusercontent.com/qboticslabs/ros_install_noetic/master/ros_install_noetic.sh ||
@@ -254,7 +254,7 @@ fi
 # CRITICAL: Never use 'set -u' in this file — Ubuntu's .bashrc has unset vars.
 # =============================================================================
 if is_done "phase03"; then skip "Phase 3 (profile) done"; else
-  phase "PHASE 3/19 — Container profile"
+  phase "PHASE 3/18 — Container profile"
 
   sudo tee "$PROFILE_FILE" >/dev/null <<'PROFILE_EOF'
 # =============================================================================
@@ -317,7 +317,7 @@ set -u
 # PHASE 4: Apt packages + pip
 # =============================================================================
 if is_done "phase04"; then skip "Phase 4 (apt/pip) done"; else
-  phase "PHASE 4/19 — Apt packages + pip"
+  phase "PHASE 4/18 — Apt packages + pip"
   export DEBIAN_FRONTEND=noninteractive
   sudo apt-get update || {
     err "apt update failed"
@@ -341,7 +341,7 @@ fi
 # PHASE 5: OpenCV legacy symlinks
 # =============================================================================
 if is_done "phase05"; then skip "Phase 5 (OpenCV) done"; else
-  phase "PHASE 5/19 — OpenCV legacy symlinks"
+  phase "PHASE 5/18 — OpenCV legacy symlinks"
   if [[ -d /usr/include/opencv4/opencv2 ]]; then
     sudo ln -sf /usr/include/opencv4/opencv2/ /usr/include/opencv
     sudo ln -sf /usr/include/opencv4/opencv2/ /usr/include/opencv2
@@ -356,7 +356,7 @@ fi
 # PHASE 6: libserial (cmake directly — BUILD_DOCS=OFF avoids sphinx crash)
 # =============================================================================
 if is_done "phase06"; then skip "Phase 6 (libserial) done"; else
-  phase "PHASE 6/19 — libserial"
+  phase "PHASE 6/18 — libserial"
   cd "$BUILD_DIR"
   [[ ! -d libserial ]] && git clone https://github.com/crayzeewulf/libserial.git
   cd libserial
@@ -383,7 +383,7 @@ fi
 # PHASE 7: gRPC (~15 min build)
 # =============================================================================
 if is_done "phase07"; then skip "Phase 7 (gRPC) done"; else
-  phase "PHASE 7/19 — gRPC ${GRPC_VERSION}"
+  phase "PHASE 7/18 — gRPC ${GRPC_VERSION}"
   cd "$BUILD_DIR"
   [[ ! -d grpc ]] && {
     git clone --branch "$GRPC_VERSION" --jobs "$(nproc)" \
@@ -418,7 +418,7 @@ fi
 # PHASE 8: MongoDB C + C++ drivers
 # =============================================================================
 if is_done "phase08"; then skip "Phase 8 (MongoDB drivers) done"; else
-  phase "PHASE 8/19 — MongoDB drivers"
+  phase "PHASE 8/18 — MongoDB drivers"
   cd "$BUILD_DIR"
   [[ ! -d mongo-c-driver ]] && git clone https://github.com/mongodb/mongo-c-driver.git
   cd mongo-c-driver
@@ -472,7 +472,7 @@ fi
 # PHASE 9: Paho MQTT C + C++
 # =============================================================================
 if is_done "phase09"; then skip "Phase 9 (Paho MQTT) done"; else
-  phase "PHASE 9/19 — Paho MQTT"
+  phase "PHASE 9/18 — Paho MQTT"
   cd "$BUILD_DIR"
   [[ ! -d paho.mqtt.c ]] && git clone https://github.com/eclipse/paho.mqtt.c.git
   cd paho.mqtt.c && git checkout "$PAHO_C_VERSION" 2>/dev/null || true
@@ -519,7 +519,7 @@ fi
 # PHASE 10: rosdep init + update (BEFORE Cartographer)
 # =============================================================================
 if is_done "phase10"; then skip "Phase 10 (rosdep) done"; else
-  phase "PHASE 10/19 — rosdep"
+  phase "PHASE 10/18 — rosdep"
   [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]] &&
     { sudo rosdep init || warn "rosdep init may already exist"; }
   rosdep update || {
@@ -534,7 +534,7 @@ fi
 # PHASE 11: Cartographer ROS (~15 min build)
 # =============================================================================
 if is_done "phase11"; then skip "Phase 11 (Cartographer) done"; else
-  phase "PHASE 11/19 — Cartographer ROS"
+  phase "PHASE 11/18 — Cartographer ROS"
   mkdir -p "$CARTO_DIR" && cd "$CARTO_DIR"
   rm -rf abseil-cpp
 
@@ -574,7 +574,7 @@ fi
 # PHASE 12: MongoDB server
 # =============================================================================
 if is_done "phase12"; then skip "Phase 12 (MongoDB server) done"; else
-  phase "PHASE 12/19 — MongoDB server"
+  phase "PHASE 12/18 — MongoDB server"
   if [[ ! -f /etc/apt/sources.list.d/mongodb-org-6.0.list ]]; then
     wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
     echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" |
@@ -595,7 +595,7 @@ fi
 # PHASE 13: Node.js via nvm
 # =============================================================================
 if is_done "phase13"; then skip "Phase 13 (Node.js) done"; else
-  phase "PHASE 13/19 — Node.js ${NODE_VERSION} via nvm"
+  phase "PHASE 13/18 — Node.js ${NODE_VERSION} via nvm"
   export NVM_DIR="$HOME/.config/nvm"
   if [[ ! -d "$NVM_DIR" ]]; then
     PROFILE=/dev/null bash -c \
@@ -617,72 +617,10 @@ if is_done "phase13"; then skip "Phase 13 (Node.js) done"; else
 fi
 
 # =============================================================================
-# PHASE 14: Neovim (latest stable) + LazyVim
-# Ubuntu 20.04 ships Neovim 0.4.x — LazyVim needs 0.9+.
-# We install the latest stable binary from GitHub.
-# Nerd Fonts must be on the HOST (Konsole renders fonts host-side).
+# PHASE 14: SSH key
 # =============================================================================
-if is_done "phase14"; then skip "Phase 14 (LazyVim) done"; else
-  phase "PHASE 14/19 — Neovim + LazyVim"
-
-  step "Removing old Neovim (if any)"
-  sudo apt-get remove -y neovim neovim-runtime 2>/dev/null || true
-
-  step "Installing latest stable Neovim"
-  if [[ -x /usr/local/bin/nvim ]]; then
-    CURRENT_NVIM=$(/usr/local/bin/nvim --version | head -1)
-    info "Already installed: $CURRENT_NVIM"
-  else
-    cd /tmp
-    curl -LO https://github.com/neovim/neovim/releases/download/stable/nvim-linux64.tar.gz \
-      || { err "Failed to download Neovim"; exit 1; }
-    sudo rm -rf /opt/nvim-linux64
-    sudo tar -xzf nvim-linux64.tar.gz -C /opt/ \
-      || { err "Failed to extract Neovim"; exit 1; }
-    sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
-    rm -f nvim-linux64.tar.gz
-    ok "Neovim $(/usr/local/bin/nvim --version | head -1) installed"
-  fi
-
-  step "Installing LazyVim dependencies"
-  sudo apt-get install -y ripgrep fd-find lazygit 2>/dev/null || {
-    # lazygit may not be in Ubuntu 20.04 repos — install from GitHub
-    sudo apt-get install -y ripgrep fd-find || warn "Some deps missing"
-    if ! command -v lazygit &>/dev/null; then
-      LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-      curl -Lo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" \
-        && sudo tar -xzf /tmp/lazygit.tar.gz -C /usr/local/bin lazygit \
-        && rm -f /tmp/lazygit.tar.gz \
-        && ok "lazygit installed" || warn "lazygit install failed (optional)"
-    fi
-  }
-
-  step "Installing LazyVim starter config"
-  if [[ -f "$HOME/.config/nvim/.lazyvim-installed" ]]; then
-    skip "Already installed"
-  else
-    if [[ -d "$HOME/.config/nvim" ]]; then
-      mv "$HOME/.config/nvim" "$HOME/.config/nvim.backup.$(date +%Y%m%d-%H%M%S)"
-      info "Backed up existing config"
-    fi
-    git clone https://github.com/LazyVim/starter "$HOME/.config/nvim" \
-      || { err "LazyVim clone failed"; exit 1; }
-    rm -rf "$HOME/.config/nvim/.git"
-    touch "$HOME/.config/nvim/.lazyvim-installed"
-    ok "LazyVim installed"
-  fi
-
-  info "First 'nvim' launch will auto-install plugins + Treesitter (~30s)"
-  info "Mason will auto-install LSPs on first file open (clangd, pyright, etc.)"
-  info "NOTE: Nerd Fonts must be installed on HOST for icons to render in Konsole"
-  mark_done "phase14"
-fi
-
-# =============================================================================
-# PHASE 15: SSH key
-# =============================================================================
-if is_done "phase15"; then skip "Phase 15 (SSH key) done"; else
-  phase "PHASE 15/19 — SSH key for GitHub"
+if is_done "phase14"; then skip "Phase 14 (SSH key) done"; else
+  phase "PHASE 14/18 — SSH key for GitHub"
   if [[ -f "$HOME/.ssh/id_ed25519" ]] || [[ -f "$HOME/.ssh/id_rsa" ]]; then
     info "SSH key already exists"
   else
@@ -706,14 +644,14 @@ if is_done "phase15"; then skip "Phase 15 (SSH key) done"; else
   else
     warn "SSH test unclear — continuing."
   fi
-  mark_done "phase15"
+  mark_done "phase14"
 fi
 
 # =============================================================================
-# PHASE 16: Clone repos via vcstool
+# PHASE 15: Clone repos via vcstool
 # =============================================================================
-if is_done "phase16"; then skip "Phase 16 (clone) done"; else
-  phase "PHASE 16/19 — Clone workspace repos"
+if is_done "phase15"; then skip "Phase 15 (clone) done"; else
+  phase "PHASE 15/18 — Clone workspace repos"
   [[ ! -f "$REPOS_YAML" ]] && {
     err "Repos YAML not found: $REPOS_YAML"
     exit 1
@@ -729,14 +667,14 @@ if is_done "phase16"; then skip "Phase 16 (clone) done"; else
   else
     skip "src/ not empty — repos likely already cloned"
   fi
-  mark_done "phase16"
+  mark_done "phase15"
 fi
 
 # =============================================================================
-# PHASE 17: CATKIN_IGNORE hardware + workspace rosdep
+# PHASE 16: CATKIN_IGNORE hardware + workspace rosdep
 # =============================================================================
-if is_done "phase17"; then skip "Phase 17 (CATKIN_IGNORE + rosdep) done"; else
-  phase "PHASE 17/19 — CATKIN_IGNORE hardware + workspace rosdep"
+if is_done "phase16"; then skip "Phase 16 (CATKIN_IGNORE + rosdep) done"; else
+  phase "PHASE 16/18 — CATKIN_IGNORE hardware + workspace rosdep"
   for pkg_path in "${CATKIN_IGNORE_PATHS[@]}"; do
     full="$WS_DIR/src/$pkg_path"
     if [[ -d "$full" ]]; then
@@ -755,14 +693,14 @@ if is_done "phase17"; then skip "Phase 17 (CATKIN_IGNORE + rosdep) done"; else
     --skip-keys=libabsl-dev || warn "Some rosdep keys skipped"
   set -u
   ok "Workspace rosdep resolved"
-  mark_done "phase17"
+  mark_done "phase16"
 fi
 
 # =============================================================================
-# PHASE 18: Simulation config (environment variables)
+# PHASE 17: Simulation config (environment variables)
 # =============================================================================
-if is_done "phase18"; then skip "Phase 18 (sim config) done"; else
-  phase "PHASE 18/19 — Simulation config"
+if is_done "phase17"; then skip "Phase 17 (sim config) done"; else
+  phase "PHASE 17/18 — Simulation config"
   mkdir -p "$(dirname "$CONFIG_FILE")"
 
   cat >"$CONFIG_FILE" <<CONFIG_EOF
@@ -821,14 +759,14 @@ export LIDAR_TYPE=2D
 CONFIG_EOF
 
   ok "Simulation config at $CONFIG_FILE"
-  mark_done "phase18"
+  mark_done "phase17"
 fi
 
 # =============================================================================
-# PHASE 19: npm install for Mission Control UI
+# PHASE 18: npm install for Mission Control UI
 # =============================================================================
-if is_done "phase19"; then skip "Phase 19 (npm) done"; else
-  phase "PHASE 19/19 — npm install"
+if is_done "phase18"; then skip "Phase 18 (npm) done"; else
+  phase "PHASE 18/18 — npm install"
   export NVM_DIR="$HOME/.config/nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
   nvm use "$NODE_VERSION"
@@ -845,7 +783,7 @@ if is_done "phase19"; then skip "Phase 19 (npm) done"; else
   else
     warn "UI dir not found: $UI_DIR — skipping"
   fi
-  mark_done "phase19"
+  mark_done "phase18"
 fi
 
 # =============================================================================
@@ -898,7 +836,7 @@ fi
 # =============================================================================
 # DONE
 # =============================================================================
-phase "ALL 19 PHASES COMPLETE"
+phase "ALL 18 PHASES COMPLETE"
 
 cat <<EOF | tee -a "$LOG_FILE"
 
