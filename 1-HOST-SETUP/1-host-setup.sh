@@ -261,7 +261,18 @@ stage_2_nvidia() {
         modinfo -F version nvidia &>/dev/null && { ok "Built: $(modinfo -F version nvidia)"; break; }
         sleep 10; w=$((w+10)); info "  ...${w}s / 300s"
     done
-    [[ $w -ge 300 ]] && { warn "Timeout. Forcing..."; run sudo akmods --force || err "Force failed"; }
+    if [[ $w -ge 300 ]]; then
+        warn "Timeout waiting for akmod. This is normal on first install."
+        warn "The module will finish building in the background."
+        mark_done "stage_2"
+        warn "==============================================================="
+        warn " REBOOT NOW — the NVIDIA module needs a reboot to load."
+        warn " After reboot, re-run: cd $SCRIPT_DIR && ./$(basename "$0")"
+        warn "==============================================================="
+        read -r -p "Reboot now? [Y/n] " ans
+        [[ "$ans" =~ ^[Nn]$ ]] && { info "Reboot manually when ready."; exit 0; }
+        info "Rebooting in 3s..."; sleep 3; sudo systemctl reboot; exit 0
+    fi
 
     step "Secure Boot check"
     local sb; sb=$(mokutil --sb-state 2>/dev/null || echo "unknown")
@@ -306,11 +317,16 @@ stage_3_asus() {
     done
 
     step "Setting GPU to Hybrid mode"
-    if command -v supergfxctl &>/dev/null; then
-        local m; m=$(supergfxctl -g 2>/dev/null || echo "unknown")
-        [[ "$m" == "Hybrid" ]] && skip "Already Hybrid" \
-            || { run sudo supergfxctl -m Hybrid && ok "Hybrid requested" || warn "May need reboot"; }
-    fi
+        if command -v supergfxctl &>/dev/null; then
+            local m; m=$(timeout 10 supergfxctl -g 2>/dev/null || echo "unknown")
+            if [[ "$m" == "Hybrid" ]]; then
+                skip "Already Hybrid"
+            elif [[ "$m" == "unknown" ]]; then
+                warn "supergfxctl not responding — will be configured after reboot"
+            else
+                run sudo supergfxctl -m Hybrid && ok "Hybrid requested" || warn "May need reboot"
+            fi
+        fi
 
     step "Reloading udev"
     run sudo udevadm control --reload; run sudo udevadm trigger; ok "Done"
@@ -552,9 +568,7 @@ stage_9_zed() {
     mark_done "stage_9"
 }
 
-# =============================================================================
-# STAGE 13 — Steam
-# =============================================================================
+
 # =============================================================================
 # STAGE 10 — Steam
 # =============================================================================
@@ -573,13 +587,26 @@ stage_10_steam() {
         run sudo dnf install -y steam-devices && ok "Installed" || warn "Failed"
     }
 
+    step "Ensuring Flathub remote"
+
+    if flatpak remotes --columns=name | grep -qx flathub; then
+        skip "Flathub already configured"
+    else
+        run flatpak remote-add --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo \
+            && ok "Flathub added" \
+            || warn "Failed to add Flathub"
+    fi
+
     step "Installing ProtonUp-Qt (user Flatpak)"
-    if flatpak --user list --app 2>/dev/null | grep -q "net.davidotek.pupgui2" \
-        || flatpak list --app 2>/dev/null | grep -q "net.davidotek.pupgui2"; then
+
+    if flatpak info --user net.davidotek.pupgui2 >/dev/null 2>&1 \
+        || flatpak info net.davidotek.pupgui2 >/dev/null 2>&1; then
         skip "Already installed"
     else
         run flatpak install --user -y --noninteractive flathub net.davidotek.pupgui2 \
-            && ok "Installed" || warn "Failed"
+            && ok "Installed" \
+            || warn "Failed"
     fi
 
     step "Installing MongoDB Compass"

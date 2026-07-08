@@ -273,6 +273,9 @@ alias fgrep='fgrep --color=auto'
 # Prompt (cyan container name + yellow path)
 export PS1='\[\033[01;36m\]📦 \u@\h\[\033[00m\]:\[\033[01;33m\]\w\[\033[00m\]\$ '
 
+# User local binaries (for git-profile and other tools)
+export PATH="$HOME/.local/bin:$PATH"
+
 # NVIDIA GPU (fixes Gazebo/rviz Mesa fallback crash on Xwayland)
 export __NV_PRIME_RENDER_OFFLOAD=1
 export __GLX_VENDOR_LIBRARY_NAME=nvidia
@@ -683,8 +686,8 @@ fi
 # =============================================================================
 if is_done "phase15"; then skip "Phase 15 (SSH key) done"; else
   phase "PHASE 15/19 — SSH key for GitHub"
-  if [[ -f "$HOME/.ssh/id_ed25519" ]] || [[ -f "$HOME/.ssh/id_rsa" ]]; then
-    info "SSH key already exists"
+if ls "$HOME"/.ssh/id_* &>/dev/null || [[ -f "$HOME/.ssh/config" ]]; then
+    info "SSH keys/config already detected"
   else
     info "No SSH key found. Generating..."
     read -r -p "Email for SSH key: " ssh_email
