@@ -686,28 +686,31 @@ fi
 # =============================================================================
 if is_done "phase15"; then skip "Phase 15 (SSH key) done"; else
   phase "PHASE 15/19 — SSH key for GitHub"
-if ls "$HOME"/.ssh/id_* &>/dev/null || [[ -f "$HOME/.ssh/config" ]]; then
-    info "SSH keys/config already detected"
+  if ls "$HOME"/.ssh/id_* &>/dev/null || [[ -f "$HOME/.ssh/config" ]]; then
+    info "SSH keys/config already detected in shared home — skipping generation."
   else
-    info "No SSH key found. Generating..."
+    info "No SSH key found. Generating default key..."
     read -r -p "Email for SSH key: " ssh_email
     mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
     ssh-keygen -t ed25519 -C "$ssh_email" -f "$HOME/.ssh/id_ed25519" -N ""
     ok "Key generated"
+
+    echo
+    echo -e "${BOLD}${YELLOW}Add this public key to GitHub → Settings → SSH Keys:${NORMAL}"
+    echo
+    cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || cat "$HOME/.ssh/id_rsa.pub"
+    echo
+    read -r -p "Press Enter after adding the key to GitHub..." _
   fi
 
-  echo
-  echo -e "${BOLD}${YELLOW}Add this public key to GitHub → Settings → SSH Keys:${NORMAL}"
-  echo
-  cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || cat "$HOME/.ssh/id_rsa.pub"
-  echo
-  read -r -p "Press Enter after adding the key to GitHub..." _
-
-  info "Testing GitHub SSH..."
-  if ssh -T -o StrictHostKeyChecking=accept-new git@github.com 2>&1 | grep -q "successfully authenticated"; then
-    ok "GitHub SSH working"
+  info "Testing GitHub SSH connection..."
+  # Try connecting to github-work first (if configured), fallback to standard github.com
+  if ssh -T -o StrictHostKeyChecking=accept-new git@github-work 2>&1 | grep -i -E "successfully authenticated|Hi "; then
+    ok "GitHub SSH working via 'github-work' alias"
+  elif ssh -T -o StrictHostKeyChecking=accept-new git@github.com 2>&1 | grep -i -E "successfully authenticated|Hi "; then
+    ok "GitHub SSH working via default 'github.com'"
   else
-    warn "SSH test unclear — continuing."
+    warn "SSH test unclear or failed — continuing build."
   fi
   mark_done "phase15"
 fi
