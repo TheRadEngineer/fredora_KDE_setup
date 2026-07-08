@@ -47,7 +47,12 @@ FONT_PACKAGES=(
     jetbrains-mono-fonts-all
     fira-code-fonts
     google-noto-fonts-common
+    google-noto-color-emoji-fonts         # emoji support
+    fontawesome-6-free-fonts              # FontAwesome icons
 )
+
+# Nerd Fonts are required for LazyVim icons in Konsole.
+# They are not in Fedora repos — installed separately in Stage 8.
 
 # =============================================================================
 # INTERNAL CONFIGURATION — usually no need to edit below this line
@@ -502,6 +507,22 @@ stage_8_cli_baseline() {
 
     step "Installing programming fonts"
     run sudo dnf install -y "${FONT_PACKAGES[@]}" && ok "Installed" || warn "Partial failure"
+
+    step "Installing JetBrainsMono Nerd Font (required for LazyVim icons in Konsole)"
+    local NERD_FONT_DIR="$HOME/.local/share/fonts/NerdFonts"
+    if [[ -d "$NERD_FONT_DIR" ]] && ls "$NERD_FONT_DIR"/*.ttf &>/dev/null 2>&1; then
+        skip "Already installed"
+    else
+        mkdir -p "$NERD_FONT_DIR"
+        local NF_URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz"
+        curl -Lo /tmp/JetBrainsMono.tar.xz "$NF_URL" \
+            && tar -xf /tmp/JetBrainsMono.tar.xz -C "$NERD_FONT_DIR" \
+            && fc-cache -fv "$NERD_FONT_DIR" \
+            && rm -f /tmp/JetBrainsMono.tar.xz \
+            && ok "JetBrainsMono Nerd Font installed" \
+            || warn "Failed — install manually from https://www.nerdfonts.com"
+        info "Set Konsole font to 'JetBrainsMono Nerd Font' for LazyVim icons"
+    fi
 
     step "Installing Node.js + npm"
     command -v node &>/dev/null && skip "Already installed ($(node --version))" || {
