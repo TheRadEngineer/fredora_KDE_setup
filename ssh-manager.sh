@@ -196,6 +196,31 @@ case "${1:-}" in
         git config $scope user.name "$GIT_PROFILE_NAME"
         git config $scope user.email "$GIT_PROFILE_EMAIL"
         echo "Switched to '$profile' ($scope_label): $GIT_PROFILE_NAME <$GIT_PROFILE_EMAIL>"
+
+        # Update origin remote URL to use the correct SSH host alias
+        if [[ "$scope" == "--local" ]] && git remote get-url origin &>/dev/null; then
+            current_url="" old_host="" new_host="" new_url=""
+            current_url=$(git remote get-url origin)
+
+            # Only modify SSH URLs (git@...)
+            if [[ "$current_url" == git@* ]]; then
+                # Extract current host (everything between @ and :)
+                old_host=$(echo "$current_url" | sed 's/git@\([^:]*\):.*/\1/')
+
+                # Determine new host based on profile
+                if [[ "$profile" == "personal" ]]; then
+                    new_host="github.com"
+                else
+                    new_host="github-${profile}"
+                fi
+
+                if [[ "$old_host" != "$new_host" ]]; then
+                    new_url=$(echo "$current_url" | sed "s|git@${old_host}:|git@${new_host}:|")
+                    git remote set-url origin "$new_url"
+                    echo "Remote updated: $old_host → $new_host"
+                fi
+            fi
+        fi
         ;;
 
     show)
