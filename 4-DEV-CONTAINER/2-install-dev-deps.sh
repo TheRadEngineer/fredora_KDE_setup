@@ -223,7 +223,7 @@ if is_done "phase04"; then skip "Phase 4 (CUDA) done"; else
     else
         # Add NVIDIA CUDA repo for Ubuntu 24.04
         info "Adding NVIDIA CUDA repository..."
-        local CUDA_KEYRING="cuda-keyring_1.1-1_all.deb"
+        CUDA_KEYRING="cuda-keyring_1.1-1_all.deb"
         curl -fsSL "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/${CUDA_KEYRING}" \
             -o "/tmp/${CUDA_KEYRING}" \
             || { err "Failed to download CUDA keyring"; exit 1; }

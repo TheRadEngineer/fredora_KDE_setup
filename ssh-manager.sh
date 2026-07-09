@@ -193,6 +193,12 @@ case "${1:-}" in
         scope_label="repo"
         [[ "${3:-}" == "-g" ]] && { scope="--global"; scope_label="global"; }
 
+        # Fall back to global if not inside a git repo
+        if [[ "$scope" == "--local" ]] && ! git rev-parse --is-inside-work-tree &>/dev/null; then
+            scope="--global"
+            scope_label="global (not in a repo)"
+        fi
+
         git config $scope user.name "$GIT_PROFILE_NAME"
         git config $scope user.email "$GIT_PROFILE_EMAIL"
         echo "Switched to '$profile' ($scope_label): $GIT_PROFILE_NAME <$GIT_PROFILE_EMAIL>"
