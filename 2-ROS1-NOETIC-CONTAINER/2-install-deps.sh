@@ -628,26 +628,26 @@ fi
 if is_done "phase14"; then skip "Phase 14 (LazyVim) done"; else
   phase "PHASE 14/19 — Neovim + LazyVim"
 
-  step "Removing old Neovim (if any)"
+  info "Removing old Neovim (if any)"
   sudo apt-get remove -y neovim neovim-runtime 2>/dev/null || true
 
-  step "Installing latest stable Neovim"
+  info "Installing latest stable Neovim"
   if [[ -x /usr/local/bin/nvim ]]; then
     CURRENT_NVIM=$(/usr/local/bin/nvim --version | head -1)
     info "Already installed: $CURRENT_NVIM"
   else
     cd /tmp
-    curl -LO https://github.com/neovim/neovim/releases/download/stable/nvim-linux64.tar.gz \
+    curl -LO https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz \
       || { err "Failed to download Neovim"; exit 1; }
-    sudo rm -rf /opt/nvim-linux64
-    sudo tar -xzf nvim-linux64.tar.gz -C /opt/ \
+    sudo rm -rf /opt/nvim-linux-x86_64
+    sudo tar -xzf nvim-linux-x86_64.tar.gz -C /opt/ \
       || { err "Failed to extract Neovim"; exit 1; }
-    sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
-    rm -f nvim-linux64.tar.gz
+    sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+    rm -f nvim-linux-x86_64.tar.gz
     ok "Neovim $(/usr/local/bin/nvim --version | head -1) installed"
   fi
 
-  step "Installing LazyVim dependencies"
+  info "Installing LazyVim dependencies"
   sudo apt-get install -y ripgrep fd-find lazygit 2>/dev/null || {
     # lazygit may not be in Ubuntu 20.04 repos — install from GitHub
     sudo apt-get install -y ripgrep fd-find || warn "Some deps missing"
@@ -660,7 +660,7 @@ if is_done "phase14"; then skip "Phase 14 (LazyVim) done"; else
     fi
   }
 
-  step "Installing LazyVim starter config"
+  info "Installing LazyVim starter config"
   if [[ -f "$HOME/.config/nvim/.lazyvim-installed" ]]; then
     skip "Already installed"
   else
@@ -703,6 +703,7 @@ if is_done "phase15"; then skip "Phase 15 (SSH key) done"; else
     read -r -p "Press Enter after adding the key to GitHub..." _
   fi
 
+  ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
   info "Testing GitHub SSH connection..."
   # Try connecting to github-work first (if configured), fallback to standard github.com
   if ssh -T -o StrictHostKeyChecking=accept-new git@github-work 2>&1 | grep -i -E "successfully authenticated|Hi "; then

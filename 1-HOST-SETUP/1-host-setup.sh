@@ -587,14 +587,14 @@ stage_10_steam() {
         run sudo dnf install -y steam-devices && ok "Installed" || warn "Failed"
     }
 
-    step "Ensuring Flathub remote"
+    step "Ensuring Flathub remote (user scope)"
 
-    if flatpak remotes --columns=name | grep -qx flathub; then
-        skip "Flathub already configured"
+    if flatpak --user remotes --columns=name 2>/dev/null | grep -qx flathub; then
+        skip "Flathub already configured (user)"
     else
-        run flatpak remote-add --if-not-exists flathub \
+        run flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo \
-            && ok "Flathub added" \
+            && ok "Flathub added (user)" \
             || warn "Failed to add Flathub"
     fi
 

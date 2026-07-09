@@ -5,7 +5,7 @@
 #
 # 8 phases — lightweight, no source builds:
 #   1. Bootstrap tools
-#   2. ROS2 Jazzy desktop-full
+#   2. ROS2 Jazzy desktop
 #   3. Container profile (prompt, NVIDIA, ROS2, colcon, PATH)
 #   4. Dev tools (C++, Python, pip, colcon extensions)
 #   5. Node.js via nvm (for Mason LSPs)
@@ -30,23 +30,20 @@ RESUME=false
 APT_PACKAGES=(
     # Build essentials
     build-essential cmake ninja-build gcc g++ gdb valgrind
-    pkg-config clang clang-tools-extra
+    pkg-config clang clangd
     autoconf libtool
 
     # Python
     python3-pip python3-venv python3-dev
 
     # ROS2 development tools
-    python3-colcon-common-extensions
-    python3-rosdep
-    python3-vcstool
     python3-argcomplete
 
     # ROS2 additional packages (simulation + visualization)
     ros-jazzy-rviz2
     ros-jazzy-rqt
     ros-jazzy-rqt-common-plugins
-    ros-jazzy-gazebo-ros-pkgs
+    ros-jazzy-ros-gz
     ros-jazzy-joint-state-publisher
     ros-jazzy-robot-state-publisher
     ros-jazzy-xacro
@@ -140,7 +137,12 @@ if is_done "phase01"; then skip "Phase 1 (bootstrap) done"; else
         || { err "Bootstrap failed"; exit 1; }
 
     # Ensure UTF-8 locale
-    sudo locale-gen en_US.UTF-8 2>/dev/null || true
+    #sudo locale-gen en_US.UTF-8 2>/dev/null || true
+    # Ensure UTF-8 locale (required by ROS2)
+    sudo apt-get install -y locales
+    sudo locale-gen en_US en_US.UTF-8
+    sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+    export LANG=en_US.UTF-8
     ok "Bootstrap tools installed"
     mark_done "phase01"
 fi
@@ -152,15 +154,32 @@ if is_done "phase02"; then skip "Phase 2 (ROS2 Jazzy) done"; else
     phase "PHASE 2/8 — ROS2 Jazzy"
 
     if [[ ! -d /opt/ros/jazzy ]]; then
-        # Add ROS2 apt repo
-        sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-            -o /usr/share/keyrings/ros-archive-keyring.gpg \
-            || { err "Failed to download ROS2 key"; exit 1; }
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \
-            | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+        # Enable Universe repo
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository -y universe
 
+        # Install ros-apt-source package (official method)
+        export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F'"' '{print $4}')
+        curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb" \
+            || { err "Failed to download ros-apt-source"; exit 1; }
+        sudo dpkg -i /tmp/ros2-apt-source.deb \
+            || { err "Failed to install ros-apt-source"; exit 1; }
+        rm -f /tmp/ros2-apt-source.deb
+
+        # Ensure noble-updates and noble-backports are in sources
+        if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+            if ! grep -q "noble-updates" /etc/apt/sources.list.d/ubuntu.sources; then
+                sudo sed -i 's/^Suites: noble$/Suites: noble noble-updates noble-backports/' /etc/apt/sources.list.d/ubuntu.sources
+                info "Added noble-updates and noble-backports to apt sources"
+            fi
+        fi
+
+        sudo apt-get clean
         sudo apt-get update || { err "apt update failed after adding ROS2 repo"; exit 1; }
-        sudo apt-get install -y ros-jazzy-desktop-full \
+        sudo apt-get full-upgrade -y
+
+        # Install ROS2 desktop + dev tools
+        sudo apt-get install -y ros-jazzy-desktop ros-dev-tools \
             || { err "ROS2 Jazzy install failed"; exit 1; }
     fi
 
@@ -271,21 +290,21 @@ fi
 if is_done "phase06"; then skip "Phase 6 (Neovim + LazyVim) done"; else
     phase "PHASE 6/8 — Neovim + LazyVim"
 
-    step_label="Installing latest stable Neovim"
-    info "$step_label"
+
+    info "Installing latest stable Neovim"
     sudo apt-get remove -y neovim neovim-runtime 2>/dev/null || true
 
     if [[ -x /usr/local/bin/nvim ]]; then
         info "Already installed: $(/usr/local/bin/nvim --version | head -1)"
     else
         cd /tmp
-        curl -LO https://github.com/neovim/neovim/releases/download/stable/nvim-linux64.tar.gz \
+        curl -LO https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz \
             || { err "Failed to download Neovim"; exit 1; }
-        sudo rm -rf /opt/nvim-linux64
-        sudo tar -xzf nvim-linux64.tar.gz -C /opt/ \
+        sudo rm -rf /opt/nvim-linux-x86_64
+        sudo tar -xzf nvim-linux-x86_64.tar.gz -C /opt/ \
             || { err "Failed to extract Neovim"; exit 1; }
-        sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
-        rm -f nvim-linux64.tar.gz
+        sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+        rm -f nvim-linux-x86_64.tar.gz
         ok "Neovim $(/usr/local/bin/nvim --version | head -1)"
     fi
 
@@ -406,7 +425,7 @@ cat <<EOF | tee -a "$LOG_FILE"
 ${GREEN}${BOLD}ROS2 Jazzy development environment is ready.${NORMAL}
 
 ${BOLD}What's installed:${NORMAL}
-  ✓ Ubuntu 24.04 + ROS2 Jazzy desktop-full
+  ✓ Ubuntu 24.04 + ROS2 Jazzy desktop
   ✓ C++ toolchain (gcc, cmake, gdb, valgrind, clang)
   ✓ Python 3 + pip
   ✓ Neovim (latest stable) + LazyVim
