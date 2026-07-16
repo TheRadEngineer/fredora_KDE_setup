@@ -23,8 +23,10 @@ set -uo pipefail
 
 # --- Arguments ---
 WS_NAME="${1:-}"
+HAS_NVIDIA="${2:-false}"
 RESUME=false
 [[ "${2:-}" == "--resume" ]] && RESUME=true
+[[ "${3:-}" == "--resume" ]] && RESUME=true
 
 if [[ -z "$WS_NAME" ]]; then
   echo "ERROR: Workspace name required."
@@ -46,7 +48,7 @@ APT_PACKAGES=(
   nmap fping dialog smartmontools libmodbus-dev libudev-dev
   autoconf libtool pkg-config cmake ninja-build stow doxygen libssl-dev
   libpthread-stubs0-dev python3-wstool python3-rosdep python3-vcstool
-  mesa-utils
+  mesa-utils sshfs
 
   # C++ libraries
   nlohmann-json3-dev libsdl-image1.2-dev libsdl-dev libfmt-dev libceres-dev
@@ -276,11 +278,13 @@ export PS1='\[\033[01;36m\]📦 \u@\h\[\033[00m\]:\[\033[01;33m\]\w\[\033[00m\]\
 # User local binaries (for git-profile and other tools)
 export PATH="$HOME/.local/bin:$PATH"
 
-# NVIDIA GPU (fixes Gazebo/rviz Mesa fallback crash on Xwayland)
-export __NV_PRIME_RENDER_OFFLOAD=1
-export __GLX_VENDOR_LIBRARY_NAME=nvidia
-export __VK_LAYER_NV_optimus=NVIDIA_only
-export LIBGL_ALWAYS_SOFTWARE=0
+# NVIDIA GPU (only set if NVIDIA is available)
+if command -v nvidia-smi &>/dev/null 2>&1; then
+    export __NV_PRIME_RENDER_OFFLOAD=1
+    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export __VK_LAYER_NV_optimus=NVIDIA_only
+    export LIBGL_ALWAYS_SOFTWARE=0
+fi
 
 # Node.js via nvm
 export NVM_DIR="$HOME/.config/nvm"
@@ -304,6 +308,56 @@ alias mongo-status='pgrep -a mongod || echo "MongoDB not running"'
 # Simulation
 alias 111='set +u; source $WS_DIR/devel/setup.bash; source $CONFIG_FILE; roscd start_anscer && roslaunch launch/start_anscer.launch'
 alias 222='cd $WS_DIR && set +u && source devel/setup.bash && source $CONFIG_FILE && cd src/anscer_iui/mission_control_ui && npm run dev'
+
+# =============================================================================
+# Robot SSH + SSHFS Mount (000)
+# Usage:
+#   000                     # connect to default robot (nvidia@192.168.1.3)
+#   000 10.0.0.5            # connect to custom IP (auto-prepends nvidia@)
+#   000 ubuntu@10.0.0.5     # connect with custom user
+# Mounts robot filesystem to ~/robot_fs_<ip>, opens Dolphin, drops into SSH.
+# Cleans up mount on exit.
+# =============================================================================
+function 000() {
+    local target="nvidia@192.168.1.3"
+    if [ -n "\$1" ]; then
+        if [[ "\$1" != *"@"* ]]; then
+            target="nvidia@\$1"
+        else
+            target="\$1"
+        fi
+    fi
+
+    local host_only="\${target#*@}"
+    local mount_dir="\$HOME/robot_fs_\$host_only"
+    local socket="/tmp/robot_sock_\$host_only"
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+
+    local fuse_cmd="fusermount"
+    command -v fusermount3 &>/dev/null && fuse_cmd="fusermount3"
+
+    \$fuse_cmd -u "\$mount_dir" 2>/dev/null
+    rm -f "\$socket"
+    mkdir -p "\$mount_dir"
+
+    echo "Connecting to \$target..."
+    sshfs -o ControlMaster=yes -o ControlPath="\$socket" \$ssh_opts "\$target":/ "\$mount_dir"
+    if [ \$? -ne 0 ]; then
+        echo "Failed to connect to \$target."
+        return 1
+    fi
+
+    sleep 1
+    xdg-open "\$mount_dir" </dev/null &>/dev/null &
+
+    echo "Filesystem mounted at \$mount_dir. Dropping into terminal..."
+    ssh -o ControlPath="\$socket" \$ssh_opts "\$target"
+
+    echo "Terminal closed. Cleaning up mount for \$host_only..."
+    \$fuse_cmd -u "\$mount_dir" 2>/dev/null
+    rm -f "\$socket"
+}
+
 PROFILE_DYNAMIC
 
   sudo chmod 644 "$PROFILE_FILE"

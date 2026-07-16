@@ -50,9 +50,13 @@ banner "ROS2 JAZZY CONTAINER BOOTSTRAP"
 command -v distrobox &>/dev/null || { err "distrobox not found. Run 1-host-setup.sh first."; exit 1; }
 ok "distrobox: $(distrobox --version | head -1)"
 
-command -v nvidia-smi &>/dev/null || { err "nvidia-smi not found. Run 1-host-setup.sh first."; exit 1; }
-nvidia-smi &>/dev/null || { err "nvidia-smi failed."; exit 1; }
-ok "NVIDIA: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+HAS_NVIDIA=false
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+    HAS_NVIDIA=true
+    ok "NVIDIA: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+else
+    warn "No NVIDIA GPU detected — container will use software rendering"
+fi
 
 [[ -f "$DEPS_SCRIPT" ]] || { err "Missing: $DEPS_SCRIPT"; exit 1; }
 ok "Required files found"
@@ -92,11 +96,14 @@ fi
 # =============================================================================
 banner "STEP 1/4 — CREATE CONTAINER"
 
+NVIDIA_FLAG=""
+$HAS_NVIDIA && NVIDIA_FLAG="--nvidia"
+
 if ! distrobox create \
     --name "$CONTAINER_NAME" \
     --hostname "$CONTAINER_NAME" \
     --image ubuntu:24.04 \
-    --nvidia \
+    $NVIDIA_FLAG \
     --yes; then
     err "Container creation failed."
     exit 1
@@ -139,16 +146,16 @@ read -r -p "Ready? [Y/n] " confirm
 if [[ "$confirm" =~ ^[Nn]$ ]]; then
     info "Cancelled. To resume later:"
     info "  distrobox enter $CONTAINER_NAME"
-    info "  bash $STAGING_DIR/2-install-ros2-deps.sh"
+    info "  bash $STAGING_DIR/2-install-ros2-deps.sh $HAS_NVIDIA"
     exit 0
 fi
 
 if ! distrobox enter "$CONTAINER_NAME" -- \
-    bash "$STAGING_DIR/2-install-ros2-deps.sh"; then
+    bash "$STAGING_DIR/2-install-ros2-deps.sh" "$HAS_NVIDIA"; then
     err "Dependency install hit an error."
     err "To resume:"
     err "  distrobox enter $CONTAINER_NAME"
-    err "  bash $STAGING_DIR/2-install-ros2-deps.sh --resume"
+    err "  bash $STAGING_DIR/2-install-ros2-deps.sh $HAS_NVIDIA --resume"
 fi
 
 # =============================================================================
