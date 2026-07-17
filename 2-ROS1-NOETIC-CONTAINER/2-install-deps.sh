@@ -312,13 +312,13 @@ alias 222='cd $WS_DIR && set +u && source devel/setup.bash && source $CONFIG_FIL
 # =============================================================================
 # Robot SSH + SSHFS Mount (000)
 # Usage:
-#   000                     # connect to default robot (nvidia@192.168.1.3)
-#   000 10.0.0.5            # connect to custom IP (auto-prepends nvidia@)
-#   000 ubuntu@10.0.0.5     # connect with custom user
+#   op                     # connect to default robot (nvidia@192.168.1.3)
+#   op 10.0.0.5            # connect to custom IP (auto-prepends nvidia@)
+#   op ubuntu@10.0.0.5     # connect with custom user
 # Mounts robot filesystem to ~/robot_fs_<ip>, opens Dolphin, drops into SSH.
 # Cleans up mount on exit.
 # =============================================================================
-function 000() {
+function op() {
     local target="nvidia@192.168.1.3"
     if [ -n "\$1" ]; then
         if [[ "\$1" != *"@"* ]]; then
