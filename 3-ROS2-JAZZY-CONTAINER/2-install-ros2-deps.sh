@@ -20,8 +20,10 @@
 
 set -uo pipefail
 
+HAS_NVIDIA="${1:-false}"
 RESUME=false
 [[ "${1:-}" == "--resume" ]] && RESUME=true
+[[ "${2:-}" == "--resume" ]] && RESUME=true
 
 # =============================================================================
 # EDITABLE CONFIGURATION
@@ -211,11 +213,13 @@ alias fgrep='fgrep --color=auto'
 # Prompt (green container name + yellow path — distinct from ROS1's cyan)
 export PS1='\[\033[01;32m\]📦 \u@\h\[\033[00m\]:\[\033[01;33m\]\w\[\033[00m\]\$ '
 
-# NVIDIA GPU (fixes Gazebo/rviz2 Mesa fallback crash)
-export __NV_PRIME_RENDER_OFFLOAD=1
-export __GLX_VENDOR_LIBRARY_NAME=nvidia
-export __VK_LAYER_NV_optimus=NVIDIA_only
-export LIBGL_ALWAYS_SOFTWARE=0
+# NVIDIA GPU (only set if NVIDIA is available)
+if command -v nvidia-smi &>/dev/null 2>&1; then
+    export __NV_PRIME_RENDER_OFFLOAD=1
+    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export __VK_LAYER_NV_optimus=NVIDIA_only
+    export LIBGL_ALWAYS_SOFTWARE=0
+fi
 
 # User local binaries (for git-profile and other tools)
 export PATH="$HOME/.local/bin:$PATH"

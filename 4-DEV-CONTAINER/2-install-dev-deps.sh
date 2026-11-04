@@ -22,8 +22,10 @@
 
 set -uo pipefail
 
+HAS_NVIDIA="${1:-false}"
 RESUME=false
 [[ "${1:-}" == "--resume" ]] && RESUME=true
+[[ "${2:-}" == "--resume" ]] && RESUME=true
 
 # =============================================================================
 # EDITABLE CONFIGURATION
@@ -161,11 +163,13 @@ alias fgrep='fgrep --color=auto'
 # Prompt (magenta container name + cyan path — distinct from ROS containers)
 export PS1='\[\033[01;35m\]📦 \u@\h\[\033[00m\]:\[\033[01;36m\]\w\[\033[00m\]\$ '
 
-# NVIDIA GPU
-export __NV_PRIME_RENDER_OFFLOAD=1
-export __GLX_VENDOR_LIBRARY_NAME=nvidia
-export __VK_LAYER_NV_optimus=NVIDIA_only
-export LIBGL_ALWAYS_SOFTWARE=0
+# NVIDIA GPU (only set if NVIDIA is available)
+if command -v nvidia-smi &>/dev/null 2>&1; then
+    export __NV_PRIME_RENDER_OFFLOAD=1
+    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export __VK_LAYER_NV_optimus=NVIDIA_only
+    export LIBGL_ALWAYS_SOFTWARE=0
+fi
 
 # User local binaries (for git-profile, uv, and other tools)
 export PATH="$HOME/.local/bin:$PATH"
@@ -218,36 +222,41 @@ fi
 if is_done "phase04"; then skip "Phase 4 (CUDA) done"; else
     phase "PHASE 4/10 — CUDA toolkit + cuDNN"
 
-    if command -v nvcc &>/dev/null; then
-        info "CUDA already installed: $(nvcc --version | grep release)"
+    if [[ "$HAS_NVIDIA" != "true" ]]; then
+        warn "No NVIDIA GPU — skipping CUDA installation"
+        mark_done "phase04"
     else
-        # Add NVIDIA CUDA repo for Ubuntu 24.04
-        info "Adding NVIDIA CUDA repository..."
-        CUDA_KEYRING="cuda-keyring_1.1-1_all.deb"
-        curl -fsSL "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/${CUDA_KEYRING}" \
-            -o "/tmp/${CUDA_KEYRING}" \
-            || { err "Failed to download CUDA keyring"; exit 1; }
-        sudo dpkg -i "/tmp/${CUDA_KEYRING}" \
-            || { err "Failed to install CUDA keyring"; exit 1; }
-        rm -f "/tmp/${CUDA_KEYRING}"
+        if command -v nvcc &>/dev/null; then
+            info "CUDA already installed: $(nvcc --version | grep release)"
+        else
+            # Add NVIDIA CUDA repo for Ubuntu 24.04
+            info "Adding NVIDIA CUDA repository..."
+            CUDA_KEYRING="cuda-keyring_1.1-1_all.deb"
+            curl -fsSL "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/${CUDA_KEYRING}" \
+                -o "/tmp/${CUDA_KEYRING}" \
+                || { err "Failed to download CUDA keyring"; exit 1; }
+            sudo dpkg -i "/tmp/${CUDA_KEYRING}" \
+                || { err "Failed to install CUDA keyring"; exit 1; }
+            rm -f "/tmp/${CUDA_KEYRING}"
 
-        sudo apt-get update || { err "apt update failed after CUDA repo"; exit 1; }
+            sudo apt-get update || { err "apt update failed after CUDA repo"; exit 1; }
 
-        info "Installing CUDA toolkit (this may take a few minutes)..."
-        sudo apt-get install -y cuda-toolkit \
-            || { err "CUDA toolkit install failed"; exit 1; }
+            info "Installing CUDA toolkit (this may take a few minutes)..."
+            sudo apt-get install -y cuda-toolkit \
+                || { err "CUDA toolkit install failed"; exit 1; }
 
-        info "Installing cuDNN..."
-        sudo apt-get install -y libcudnn9-cuda-12 libcudnn9-dev-cuda-12 \
-            || warn "cuDNN install failed — may need manual install"
-    fi
+            info "Installing cuDNN..."
+            sudo apt-get install -y libcudnn9-cuda-12 libcudnn9-dev-cuda-12 \
+                || warn "cuDNN install failed — may need manual install"
+        fi
 
-    # Verify
-    export PATH="/usr/local/cuda/bin:$PATH"
-    if command -v nvcc &>/dev/null; then
-        ok "CUDA: $(nvcc --version | grep release)"
-    else
-        warn "nvcc not on PATH — check /usr/local/cuda/bin"
+        # Verify
+        export PATH="/usr/local/cuda/bin:$PATH"
+        if command -v nvcc &>/dev/null; then
+            ok "CUDA: $(nvcc --version | grep release)"
+        else
+            warn "nvcc not on PATH — check /usr/local/cuda/bin"
+        fi
     fi
 
     mark_done "phase04"

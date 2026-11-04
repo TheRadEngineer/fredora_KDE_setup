@@ -66,15 +66,13 @@ command -v distrobox &>/dev/null || {
 }
 ok "distrobox: $(distrobox --version | head -1)"
 
-command -v nvidia-smi &>/dev/null || {
-  err "nvidia-smi not found. Run 00-host-setup.sh first."
-  exit 1
-}
-nvidia-smi &>/dev/null || {
-  err "nvidia-smi failed. Try: sudo supergfxctl -m Hybrid && reboot."
-  exit 1
-}
-ok "NVIDIA: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+HAS_NVIDIA=false
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+    HAS_NVIDIA=true
+    ok "NVIDIA: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+else
+    warn "No NVIDIA GPU detected — container will use software rendering"
+fi
 
 [[ -f "$DEPS_SCRIPT" ]] || {
   err "Missing: $DEPS_SCRIPT"
@@ -130,13 +128,14 @@ fi
 banner "STEP 1/4 — CREATE CONTAINER"
 
 info "Shared home (no --home isolation) — same architecture as working ros1-noetic"
-info "  --nvidia  (GPU passthrough)"
+NVIDIA_FLAG=""
+$HAS_NVIDIA && NVIDIA_FLAG="--nvidia"
 
 if ! distrobox create \
   --name "$CONTAINER_NAME" \
   --hostname "$CONTAINER_NAME" \
   --image ubuntu:20.04 \
-  --nvidia \
+  $NVIDIA_FLAG \
   --yes; then
   err "Container creation failed."
   exit 1
@@ -182,16 +181,16 @@ read -r -p "Ready? [Y/n] " confirm
 if [[ "$confirm" =~ ^[Nn]$ ]]; then
   info "Cancelled. To resume later:"
   info "  distrobox enter $CONTAINER_NAME"
-  info "  bash $STAGING_DIR/2-install-deps.sh $WS_NAME"
+  info "  bash $STAGING_DIR/2-install-deps.sh $WS_NAME $HAS_NVIDIA"
   exit 0
 fi
 
 if ! distrobox enter "$CONTAINER_NAME" -- \
-  bash "$STAGING_DIR/2-install-deps.sh" "$WS_NAME"; then
+  bash "$STAGING_DIR/2-install-deps.sh" "$WS_NAME" "$HAS_NVIDIA"; then
   err "Dependency install hit an error."
   err "To resume:"
   err "  distrobox enter $CONTAINER_NAME"
-  err "  bash $STAGING_DIR/2-install-deps.sh $WS_NAME --resume"
+  err "  bash $STAGING_DIR/2-install-deps.sh $WS_NAME $HAS_NVIDIA --resume"
 fi
 
 # =============================================================================
