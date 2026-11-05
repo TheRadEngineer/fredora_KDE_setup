@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 00a-debloat.sh  —  Fedora 44 KDE Plasma Debloat  (v2)
-# Run this BEFORE 00-host-setup.sh on a fresh Fedora 44 KDE install.
+# 0-debloat.sh  —  Fedora KDE Plasma Debloat  (v2)
+# Run this BEFORE 1-host-setup.sh on a fresh Fedora KDE install (44/45).
 #
 # Removes pre-installed apps AND cleans up every trace they leave behind:
 # config dirs, cache, data dirs, desktop entries, icon cache, menu database.
@@ -13,14 +13,13 @@
 # the rest of the category.
 #
 # USAGE:
-#   ./00a-debloat.sh                 # interactive (shows list, asks to proceed)
-#   ./00a-debloat.sh --yes           # skip confirmation
-#   ./00a-debloat.sh --dry-run       # show what would happen, touch nothing
+#   ./0-debloat.sh                   # interactive (shows list, asks to proceed)
+#   ./0-debloat.sh --yes             # skip confirmation
+#   ./0-debloat.sh --dry-run         # show what would happen, touch nothing
 #
 # CUSTOMIZATION:
 #   Edit the REMOVE_* arrays below. Comment out any package you want to keep.
 #
-# See README-debloat.md for full documentation.
 # =============================================================================
 
 set -uo pipefail
@@ -136,11 +135,7 @@ REMOVE_APPS=(
     khelpcenter             # KDE help browser
     neochat                 # Matrix chat client
     kleopatra               # certificate/encryption manager
-    krdc                    # remote desktop client
-    krdp                    # remote desktop protocol
-    krfb                    # remote desktop server
     qrca                    # QR code scanner
-    elisa-player            # music player
     kcalc                   # calculator
     kdebugsettings          # KDE debug logging config
 )
@@ -264,7 +259,7 @@ SYSTEM_DIRS_TO_CLEAN=(
 
 echo
 echo -e "${BOLD}${BLUE}================================================================${NORMAL}"
-echo -e "${BOLD}${BLUE}  FEDORA 44 KDE — DEBLOAT (v2)${NORMAL}"
+echo -e "${BOLD}${BLUE}  FEDORA KDE — DEBLOAT (v2)${NORMAL}"
 echo -e "${BOLD}${BLUE}================================================================${NORMAL}"
 echo
 
@@ -589,4 +584,4 @@ echo | tee -a "$LOG_FILE"
 info "Removed apps will no longer appear in your application menu."
 info "If any phantom entries persist, log out and back in."
 echo | tee -a "$LOG_FILE"
-info "Next step: ./00-host-setup.sh --verbose"
+info "Next step: ./1-host-setup.sh --verbose"

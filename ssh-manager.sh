@@ -6,7 +6,7 @@
 # Works on: host, distrobox containers, docker containers (if home is mounted)
 #
 # Sets up:
-#   1. Named SSH keys per GitHub account (default: work + showcase)
+#   1. Named SSH keys per GitHub account (default: personal + work)
 #   2. Optional additional profiles (prompted interactively)
 #   3. ~/.ssh/config with Host aliases for each account
 #   4. Robot SSH config (skips host key checking for robot IPs)
@@ -19,13 +19,14 @@
 #   ./ssh-manager.sh robot-clear    # Clear known_hosts for robot IPs
 #
 # After setup, in any repo:
-#   git profile use work            # Switch to work identity + fix remote
-#   git profile use showcase        # Switch to showcase identity + fix remote
+#   git profile clone <link>        # Clone any GitHub link; asks personal/work
+#   git profile clone <link> work   # ...or name the profile
+#   git profile use work            # Switch identity + fix remote of this repo
 #   git profile show                # Show current identity
 #
 # Clone with specific accounts:
 #   git clone git@github-work:company/repo.git
-#   git clone git@github.com:user/portfolio.git      (showcase = default)
+#   git clone git@github.com:user/repo.git           (personal = default)
 #
 # Robot SSH (no host key issues):
 #   ssh user@192.168.1.3            # Just works, no key conflicts
@@ -45,7 +46,7 @@ KNOWN_HOSTS="$SSH_DIR/known_hosts"
 # Default profiles — always set up. Format: name:description
 # The FIRST profile listed becomes the default (maps to github.com)
 DEFAULT_PROFILES=(
-    "showcase:Portfolio/Showcase GitHub (DEFAULT — git@github.com URLs)"
+    "personal:Personal GitHub (DEFAULT — git@github.com URLs)"
     "work:Work GitHub (git@github-work URLs)"
 )
 
@@ -77,6 +78,15 @@ load_default_profiles() {
         IFS=':' read -r name desc <<< "$entry"
         ALL_PROFILES["$name"]="$desc"
         [[ -z "$DEFAULT_PROFILE_NAME" ]] && DEFAULT_PROFILE_NAME="$name"
+    done
+
+    # Also pick up extra profiles created in earlier runs, so re-running setup
+    # (or list/test) does not drop them from ~/.ssh/config.
+    local f n
+    for f in "$SSH_DIR"/git-profile-*; do
+        [[ -f "$f" ]] || continue
+        n="${f##*/git-profile-}"
+        [[ -n "${ALL_PROFILES[$n]+x}" ]] || ALL_PROFILES["$n"]="(added earlier)"
     done
 }
 
@@ -155,8 +165,8 @@ HEADER
 
         if [[ "$profile" == "$DEFAULT_PROFILE_NAME" ]]; then
             cat >> "$SSH_CONFIG" <<EOF
-# $profile (DEFAULT — git@github.com URLs use this)
-Host github.com
+# $profile (DEFAULT — git@github.com URLs use this; git@github-${profile} also works)
+Host github.com github-${profile}
     HostName github.com
     User git
     IdentityFile $key_file
@@ -191,98 +201,138 @@ install_git_profile() {
 
     mkdir -p "$(dirname "$GIT_PROFILE_BIN")"
 
-    cat > "$GIT_PROFILE_BIN" <<GITPROFILE
+    cat > "$GIT_PROFILE_BIN" <<'GITPROFILE'
 #!/usr/bin/env bash
-# git-profile — switch git identity + remote URL per-repo or globally
+# git-profile — switch git identity / clone with the right account
+#   git profile clone <link> [profile] [dir]   clone, rewriting the link for the profile
+#   git profile use <profile> [-g]             set identity (+ fix origin) for this repo
+#   git profile show | list
 set -uo pipefail
 
-SSH_DIR="\$HOME/.ssh"
-DEFAULT_PROFILE_NAME="${DEFAULT_PROFILE_NAME}"
+SSH_DIR="$HOME/.ssh"
+DEFAULT_PROFILE_NAME="__DEFAULT_PROFILE__"
 
-case "\${1:-}" in
-    use)
-        profile="\${2:-}"
-        [[ -z "\$profile" ]] && { echo "Usage: git profile use <profile> [-g]"; exit 1; }
+profile_names() {
+    local f
+    for f in "$SSH_DIR"/git-profile-*; do
+        [[ -f "$f" ]] && basename "$f" | sed 's/^git-profile-//'
+    done
+}
 
-        profile_file="\$SSH_DIR/git-profile-\${profile}"
-        [[ ! -f "\$profile_file" ]] && { echo "Profile '\$profile' not found. Run: ssh-manager.sh list"; exit 1; }
+host_for() {   # profile -> ssh host alias
+    if [[ "$1" == "$DEFAULT_PROFILE_NAME" ]]; then echo "github.com"; else echo "github-$1"; fi
+}
 
-        source "\$profile_file"
+case "${1:-}" in
+    clone)
+        url="${2:-}"; profile="${3:-}"
+        [[ -z "$url" ]] && { echo "Usage: git profile clone <link> [profile] [dir]"; exit 1; }
 
-        scope="--local"
-        scope_label="repo"
-        [[ "\${3:-}" == "-g" ]] && { scope="--global"; scope_label="global"; }
+        # Ask which profile if not given
+        if [[ -z "$profile" ]]; then
+            mapfile -t names < <(profile_names)
+            [[ ${#names[@]} -eq 0 ]] && { echo "No profiles. Run: ssh-manager.sh setup"; exit 1; }
+            echo "Clone as which profile?"
+            PS3="Choose number: "
+            select profile in "${names[@]}"; do [[ -n "$profile" ]] && break; done
+            [[ -z "$profile" ]] && exit 1
+        fi
+        profile_file="$SSH_DIR/git-profile-${profile}"
+        [[ ! -f "$profile_file" ]] && { echo "Profile '$profile' not found. Run: ssh-manager.sh list"; exit 1; }
 
-        # Fall back to global if not inside a git repo
-        if [[ "\$scope" == "--local" ]] && ! git rev-parse --is-inside-work-tree &>/dev/null; then
-            scope="--global"
-            scope_label="global (not in a repo)"
+        # Reduce any form of link to "owner/repo":
+        #   https://github.com/o/r(.git)  git@github.com:o/r.git  git@github-work:o/r.git
+        #   ssh://git@github.com/o/r      github.com/o/r          o/r
+        path="$url"
+        path="${path#ssh://}"; path="${path#git@}"; path="${path#https://}"; path="${path#http://}"
+        case "$path" in
+            github.com[:/]*|github-*[:/]*) path="${path#*[:/]}" ;;
+        esac
+        path="$(echo "$path" | cut -d/ -f1-2)"   # drop /tree/main/... from browser links
+        path="${path%.git}"
+        if [[ ! "$path" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+            echo "Could not understand link: $url"; exit 1
         fi
 
-        git config \$scope user.name "\$GIT_PROFILE_NAME"
-        git config \$scope user.email "\$GIT_PROFILE_EMAIL"
-        echo "Switched to '\$profile' (\$scope_label): \$GIT_PROFILE_NAME <\$GIT_PROFILE_EMAIL>"
+        new_url="git@$(host_for "$profile"):${path}.git"
+        dir="${4:-${path##*/}}"
+        echo "Cloning as '$profile': $new_url"
+        git clone "$new_url" "$dir" || exit $?
 
-        # Update origin remote URL to use the correct SSH host alias
-        if [[ "\$scope" == "--local" ]] && git remote get-url origin &>/dev/null; then
-            current_url="" old_host="" new_host="" new_url=""
-            current_url=\$(git remote get-url origin)
+        source "$profile_file"
+        git -C "$dir" config user.name "$GIT_PROFILE_NAME"
+        git -C "$dir" config user.email "$GIT_PROFILE_EMAIL"
+        echo "Done: $dir  (identity: $GIT_PROFILE_NAME <$GIT_PROFILE_EMAIL>)"
+        ;;
 
-            if [[ "\$current_url" == git@* ]]; then
-                old_host=\$(echo "\$current_url" | sed 's/git@\([^:]*\):.*/\1/')
+    use)
+        profile="${2:-}"
+        [[ -z "$profile" ]] && { echo "Usage: git profile use <profile> [-g]"; exit 1; }
 
-                if [[ "\$profile" == "\$DEFAULT_PROFILE_NAME" ]]; then
-                    new_host="github.com"
-                else
-                    new_host="github-\${profile}"
-                fi
+        profile_file="$SSH_DIR/git-profile-${profile}"
+        [[ ! -f "$profile_file" ]] && { echo "Profile '$profile' not found. Run: ssh-manager.sh list"; exit 1; }
+        source "$profile_file"
 
-                if [[ "\$old_host" != "\$new_host" ]]; then
-                    new_url=\$(echo "\$current_url" | sed "s|git@\${old_host}:|git@\${new_host}:|")
-                    git remote set-url origin "\$new_url"
-                    echo "Remote updated: \$old_host → \$new_host"
+        scope="--local"; scope_label="repo"
+        [[ "${3:-}" == "-g" ]] && { scope="--global"; scope_label="global"; }
+
+        if [[ "$scope" == "--local" ]] && ! git rev-parse --is-inside-work-tree &>/dev/null; then
+            scope="--global"; scope_label="global (not in a repo)"
+        fi
+
+        git config $scope user.name "$GIT_PROFILE_NAME"
+        git config $scope user.email "$GIT_PROFILE_EMAIL"
+        echo "Switched to '$profile' ($scope_label): $GIT_PROFILE_NAME <$GIT_PROFILE_EMAIL>"
+
+        # Point origin at the right SSH host alias
+        if [[ "$scope" == "--local" ]] && git remote get-url origin &>/dev/null; then
+            current_url="$(git remote get-url origin)"
+            if [[ "$current_url" == git@* ]]; then
+                old_host="$(echo "$current_url" | sed 's/git@\([^:]*\):.*/\1/')"
+                new_host="$(host_for "$profile")"
+                if [[ "$old_host" != "$new_host" ]]; then
+                    git remote set-url origin "$(echo "$current_url" | sed "s|git@${old_host}:|git@${new_host}:|")"
+                    echo "Remote updated: $old_host → $new_host"
                 fi
             fi
         fi
         ;;
 
     show)
-        name=\$(git config user.name 2>/dev/null || echo "(not set)")
-        email=\$(git config user.email 2>/dev/null || echo "(not set)")
-        echo "Current: \$name <\$email>"
-
-        for f in "\$SSH_DIR"/git-profile-*; do
-            [[ -f "\$f" ]] || continue
-            source "\$f"
-            if [[ "\$GIT_PROFILE_EMAIL" == "\$email" ]]; then
-                pname=\$(basename "\$f" | sed 's/git-profile-//')
-                echo "Profile: \$pname"
-                break
+        name=$(git config user.name 2>/dev/null || echo "(not set)")
+        email=$(git config user.email 2>/dev/null || echo "(not set)")
+        echo "Current: $name <$email>"
+        for f in "$SSH_DIR"/git-profile-*; do
+            [[ -f "$f" ]] || continue
+            source "$f"
+            if [[ "$GIT_PROFILE_EMAIL" == "$email" ]]; then
+                echo "Profile: $(basename "$f" | sed 's/^git-profile-//')"; break
             fi
         done
         ;;
 
     list)
         echo "Available profiles:"
-        for f in "\$SSH_DIR"/git-profile-*; do
-            [[ -f "\$f" ]] || continue
-            source "\$f"
-            pname=\$(basename "\$f" | sed 's/git-profile-//')
-            default_tag=""
-            [[ "\$pname" == "\$DEFAULT_PROFILE_NAME" ]] && default_tag=" (default)"
-            echo "  \$pname\$default_tag: \$GIT_PROFILE_NAME <\$GIT_PROFILE_EMAIL>"
+        for f in "$SSH_DIR"/git-profile-*; do
+            [[ -f "$f" ]] || continue
+            source "$f"
+            pname="$(basename "$f" | sed 's/^git-profile-//')"
+            tag=""; [[ "$pname" == "$DEFAULT_PROFILE_NAME" ]] && tag=" (default)"
+            echo "  $pname$tag: $GIT_PROFILE_NAME <$GIT_PROFILE_EMAIL>"
         done
         ;;
 
     *)
-        echo "Usage: git profile <use|show|list>"
-        echo "  use <profile> [-g]   Set identity + fix remote (per-repo or -g global)"
-        echo "  show                 Show current identity"
-        echo "  list                 List available profiles"
+        echo "Usage: git profile <clone|use|show|list>"
+        echo "  clone <link> [profile] [dir]   Clone with the right account (asks if no profile)"
+        echo "  use <profile> [-g]             Set identity + fix origin (per-repo, or -g global)"
+        echo "  show                           Show current identity"
+        echo "  list                           List profiles"
         ;;
 esac
 GITPROFILE
 
+    sed -i "s|__DEFAULT_PROFILE__|${DEFAULT_PROFILE_NAME}|" "$GIT_PROFILE_BIN"
     chmod +x "$GIT_PROFILE_BIN"
     ok "git-profile installed to $GIT_PROFILE_BIN"
 }
@@ -456,7 +506,11 @@ main() {
             done
             echo "  git profile show"
             echo
-            echo "Clone with specific accounts:"
+            echo "Easiest: paste ANY GitHub link, it is rewritten for you:"
+            echo "  git profile clone https://github.com/org/repo          # asks personal/work"
+            echo "  git profile clone https://github.com/org/repo work"
+            echo
+            echo "Or clone by hand with the host alias:"
             for profile in "${!ALL_PROFILES[@]}"; do
                 local host="github.com"
                 [[ "$profile" != "$DEFAULT_PROFILE_NAME" ]] && host="github-${profile}"
