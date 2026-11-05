@@ -219,6 +219,7 @@ alias myip='curl -s ifconfig.me && echo'
 alias weather='curl wttr.in/?format=3'
 alias path='echo $PATH | tr ":" "\n"'
 alias reload='source ~/.bashrc && echo "Reloaded"'
+alias clr='clear && source ~/.bashrc'
 SECTION
 }
 
