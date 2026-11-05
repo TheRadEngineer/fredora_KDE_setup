@@ -76,7 +76,47 @@ cat <<'SECTION'
 # =============================================================================
 # System
 # =============================================================================
-alias update='sudo dnf upgrade --refresh -y'
+
+# update: DNF + Flatpak (user & system) + firmware check + NVIDIA/CDI + reboot check
+update() {
+    echo "==> DNF packages"
+    sudo dnf upgrade --refresh -y || { echo "DNF failed — stopping."; return 1; }
+
+    if command -v flatpak &>/dev/null; then
+        echo; echo "==> Flatpak (user)"
+        flatpak update --user -y
+        echo "==> Flatpak (system)"
+        sudo flatpak update --system -y
+        flatpak uninstall --unused -y >/dev/null 2>&1
+    fi
+
+    if command -v fwupdmgr &>/dev/null; then
+        echo; echo "==> Firmware (check only)"
+        fwupdmgr refresh --force >/dev/null 2>&1
+        if fwupdmgr get-updates >/dev/null 2>&1; then
+            echo "Firmware updates available. Apply with: fwupdmgr update"
+        else
+            echo "No firmware updates."
+        fi
+    fi
+
+    if command -v nvidia-ctk &>/dev/null && [[ -d /etc/cdi ]]; then
+        echo; echo "==> NVIDIA container (CDI) spec"
+        if nvidia-smi &>/dev/null; then
+            sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml >/dev/null 2>&1 \
+                && echo "CDI spec refreshed." || echo "CDI refresh failed — run: cdi-refresh"
+        else
+            echo "NVIDIA driver not loaded (just updated?). Reboot, then run: cdi-refresh"
+        fi
+    fi
+
+    echo
+    if sudo dnf needs-restarting -r >/dev/null 2>&1; then
+        echo "Done. No reboot needed."
+    else
+        echo "Done. REBOOT recommended (kernel or core libraries updated)."
+    fi
+}
 alias installed='dnf list --installed'
 alias search='dnf search'
 alias cleanup='sudo dnf autoremove -y && sudo dnf clean all'
